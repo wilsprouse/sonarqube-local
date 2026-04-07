@@ -87,7 +87,7 @@ parse_args() {
   fi
 
   if [[ -z "$PROJECT_NAME" && -n "$PROJECT_DIR" ]]; then
-    PROJECT_NAME="$(basename "$(realpath "$PROJECT_DIR")")"
+    PROJECT_NAME="$(basename "$(cd "$PROJECT_DIR" && pwd)")"
   fi
 }
 
@@ -240,7 +240,7 @@ create_token() {
 run_scanner() {
   local token="$1"
   local abs_dir
-  abs_dir="$(realpath "$PROJECT_DIR")"
+  abs_dir="$(cd "$PROJECT_DIR" && pwd)"
 
   info "Running sonar-scanner on '${abs_dir}'..."
 
