@@ -39,10 +39,10 @@ green()  { printf '\033[0;32m%s\033[0m\n' "$*"; }
 yellow() { printf '\033[0;33m%s\033[0m\n' "$*"; }
 bold()   { printf '\033[1m%s\033[0m\n' "$*"; }
 
-log()  { echo "[$(date '+%H:%M:%S')] $*"; }
+log()  { echo "[$(date '+%H:%M:%S')] $*" >&2; }
 info() { log "$(green "INFO") $*"; }
 warn() { log "$(yellow "WARN") $*"; }
-die()  { log "$(red "ERROR") $*" >&2; exit 1; }
+die()  { log "$(red "ERROR") $*"; exit 1; }
 
 usage() {
   # Print only the top header comment block (lines 2..first blank/non-comment line)
@@ -244,7 +244,16 @@ run_scanner() {
   info "Running sonar-scanner on '${abs_dir}'..."
 
   # Use the official sonar-scanner-cli Docker image so no local install needed.
+  # Detect host architecture to avoid cross-platform emulation warnings.
+  local host_arch
+  host_arch="$(uname -m)"
+  case "$host_arch" in
+    arm64|aarch64) host_arch="linux/arm64" ;;
+    *)             host_arch="linux/amd64" ;;
+  esac
+
   docker run --rm \
+    --platform "$host_arch" \
     --network host \
     -v "${abs_dir}:/usr/src" \
     sonarsource/sonar-scanner-cli \
