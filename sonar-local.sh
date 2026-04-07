@@ -65,9 +65,9 @@ require_command() {
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      -d|--dir)    PROJECT_DIR="${2:?"--dir requires an argument"}";  shift 2 ;;
-      -n|--name)   PROJECT_NAME="${2:?"--name requires an argument"}"; shift 2 ;;
-      -p|--port)   SONAR_PORT="${2:?"--port requires an argument"}";  shift 2 ;;
+      -d|--dir)    PROJECT_DIR="${2:?"--dir requires a path argument"}";  shift 2 ;;
+      -n|--name)   PROJECT_NAME="${2:?"--name requires a name argument"}"; shift 2 ;;
+      -p|--port)   SONAR_PORT="${2:?"--port requires a port number"}";    shift 2 ;;
       --skip-start) SKIP_START=true; shift ;;
       --skip-scan)  SKIP_SCAN=true;  shift ;;
       --down)       BRING_DOWN=true; shift ;;
@@ -151,32 +151,25 @@ sonar_api() {
 change_default_password() {
   info "Checking whether the default admin password needs to be changed..."
 
-  # Try logging in with the default password. If it succeeds the password
-  # hasn't been changed yet.
+  # Try logging in with the default password. A 200 response means the
+  # default credentials are still active — rotate the password immediately.
   local http_status
   http_status=$(curl -s -o /dev/null -w "%{http_code}" \
     -u "${ADMIN_USER}:${ADMIN_DEFAULT_PASS}" \
     "${SONAR_BASE_URL}/api/authentication/validate")
 
   if [[ "$http_status" == "200" ]]; then
-    # Verify that the response says the session is valid
-    local valid
-    valid=$(curl -sf -u "${ADMIN_USER}:${ADMIN_DEFAULT_PASS}" \
-      "${SONAR_BASE_URL}/api/authentication/validate" | grep -o '"valid":true' || true)
-
-    if [[ "$valid" == '"valid":true' ]]; then
-      ADMIN_PASS="$(generate_password)"
-      info "Changing default admin password..."
-      curl -sf -X POST \
-        -u "${ADMIN_USER}:${ADMIN_DEFAULT_PASS}" \
-        "${SONAR_BASE_URL}/api/users/change_password" \
-        --data-urlencode "login=${ADMIN_USER}" \
-        --data-urlencode "password=${ADMIN_PASS}" \
-        --data-urlencode "previousPassword=${ADMIN_DEFAULT_PASS}" \
-        >/dev/null
-      info "Admin password changed successfully."
-      return
-    fi
+    ADMIN_PASS="$(generate_password)"
+    info "Changing default admin password..."
+    curl -sf -X POST \
+      -u "${ADMIN_USER}:${ADMIN_DEFAULT_PASS}" \
+      "${SONAR_BASE_URL}/api/users/change_password" \
+      --data-urlencode "login=${ADMIN_USER}" \
+      --data-urlencode "password=${ADMIN_PASS}" \
+      --data-urlencode "previousPassword=${ADMIN_DEFAULT_PASS}" \
+      >/dev/null
+    info "Admin password changed successfully."
+    return
   fi
 
   # The default password no longer works — prompt for the current password
@@ -191,7 +184,7 @@ change_default_password() {
     printf '\n'
   fi
 
-  # Validate the supplied password
+  # Validate the supplied password immediately so we fail fast before doing anything else.
   local valid
   valid=$(curl -sf -u "${ADMIN_USER}:${ADMIN_PASS}" \
     "${SONAR_BASE_URL}/api/authentication/validate" | grep -o '"valid":true' || true)
@@ -229,7 +222,16 @@ create_token() {
     --data-urlencode "name=${token_name}" \
     --data-urlencode "type=PROJECT_ANALYSIS_TOKEN" \
     --data-urlencode "projectKey=${PROJECT_NAME}")
-  printf '%s' "$response" | grep -o '"token":"[^"]*"' | sed 's/"token":"//;s/"//'
+
+  local token
+  if command -v jq >/dev/null 2>&1; then
+    token=$(printf '%s' "$response" | jq -r '.token')
+  else
+    token=$(printf '%s' "$response" | grep -o '"token":"[^"]*"' | sed 's/"token":"//;s/"//')
+  fi
+
+  [[ -n "$token" ]] || die "Failed to extract analysis token from API response."
+  printf '%s' "$token"
 }
 
 # ---------------------------------------------------------------------------
