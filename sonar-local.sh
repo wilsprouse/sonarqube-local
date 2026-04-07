@@ -246,15 +246,29 @@ run_scanner() {
   # Use the official sonar-scanner-cli Docker image so no local install needed.
   # sonarsource/sonar-scanner-cli is only published for linux/amd64; pin the
   # platform explicitly so Docker uses emulation on Apple Silicon without error.
+  #
+  # macOS (Docker Desktop) does not support --network host; containers must
+  # reach the Mac via 'host.docker.internal' instead of 'localhost'.
+  # On Linux --network host works correctly with localhost.
+  local scanner_url network_flag
+  if [[ "$(uname)" == "Darwin" ]]; then
+    scanner_url="${SONAR_BASE_URL/localhost/host.docker.internal}"
+    network_flag=""
+  else
+    scanner_url="$SONAR_BASE_URL"
+    network_flag="--network host"
+  fi
+
+  # shellcheck disable=SC2086
   docker run --rm \
     --platform linux/amd64 \
-    --network host \
+    $network_flag \
     -v "${abs_dir}:/usr/src" \
     sonarsource/sonar-scanner-cli \
     -Dsonar.projectKey="${PROJECT_NAME}" \
     -Dsonar.projectName="${PROJECT_NAME}" \
     -Dsonar.sources=/usr/src \
-    -Dsonar.host.url="${SONAR_BASE_URL}" \
+    -Dsonar.host.url="${scanner_url}" \
     -Dsonar.token="${token}"
 }
 
