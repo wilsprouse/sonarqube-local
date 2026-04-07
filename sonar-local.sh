@@ -151,16 +151,16 @@ sonar_api() {
 change_default_password() {
   info "Checking whether the default admin password needs to be changed..."
 
-  # Try logging in with the default password. A 200 response means the
-  # default credentials are still active — rotate the password immediately.
-  local http_status
-  http_status=$(curl -s -o /dev/null -w "%{http_code}" \
+  # /api/authentication/validate always returns HTTP 200; validity is in the body.
+  # Check whether admin:admin (the factory default) is still active.
+  local default_valid
+  default_valid=$(curl -s \
     -u "${ADMIN_USER}:${ADMIN_DEFAULT_PASS}" \
-    "${SONAR_BASE_URL}/api/authentication/validate")
+    "${SONAR_BASE_URL}/api/authentication/validate" | grep -o '"valid":true' || true)
 
-  if [[ "$http_status" == "200" ]]; then
+  if [[ "$default_valid" == '"valid":true' ]]; then
     ADMIN_PASS="$(generate_password)"
-    info "Changing default admin password..."
+    info "Rotating default admin password..."
     curl -sf -X POST \
       -u "${ADMIN_USER}:${ADMIN_DEFAULT_PASS}" \
       "${SONAR_BASE_URL}/api/users/change_password" \
@@ -168,25 +168,24 @@ change_default_password() {
       --data-urlencode "password=${ADMIN_PASS}" \
       --data-urlencode "previousPassword=${ADMIN_DEFAULT_PASS}" \
       >/dev/null
-    info "Admin password changed successfully."
+    info "Admin password rotated successfully."
     return
   fi
 
-  # The default password no longer works — prompt for the current password
-  # (or read from env var SONAR_ADMIN_PASSWORD if set).
+  # Default password no longer works — use SONAR_ADMIN_PASSWORD env var or prompt.
   if [[ -n "${SONAR_ADMIN_PASSWORD:-}" ]]; then
     ADMIN_PASS="$SONAR_ADMIN_PASSWORD"
     info "Using admin password from SONAR_ADMIN_PASSWORD environment variable."
   else
-    warn "The default admin password has already been changed."
+    warn "Default admin password has already been changed."
     printf "Enter the current admin password: "
     read -r -s ADMIN_PASS
     printf '\n'
   fi
 
-  # Validate the supplied password immediately so we fail fast before doing anything else.
+  # Validate the supplied password immediately so we fail fast.
   local valid
-  valid=$(curl -sf -u "${ADMIN_USER}:${ADMIN_PASS}" \
+  valid=$(curl -s -u "${ADMIN_USER}:${ADMIN_PASS}" \
     "${SONAR_BASE_URL}/api/authentication/validate" | grep -o '"valid":true' || true)
   [[ "$valid" == '"valid":true' ]] || die "Admin credentials are invalid. Aborting."
   info "Admin credentials validated."
