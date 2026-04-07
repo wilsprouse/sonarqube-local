@@ -244,16 +244,10 @@ run_scanner() {
   info "Running sonar-scanner on '${abs_dir}'..."
 
   # Use the official sonar-scanner-cli Docker image so no local install needed.
-  # Detect host architecture to avoid cross-platform emulation warnings.
-  local host_arch
-  host_arch="$(uname -m)"
-  case "$host_arch" in
-    arm64|aarch64) host_arch="linux/arm64" ;;
-    *)             host_arch="linux/amd64" ;;
-  esac
-
+  # sonarsource/sonar-scanner-cli is only published for linux/amd64; pin the
+  # platform explicitly so Docker uses emulation on Apple Silicon without error.
   docker run --rm \
-    --platform "$host_arch" \
+    --platform linux/amd64 \
     --network host \
     -v "${abs_dir}:/usr/src" \
     sonarsource/sonar-scanner-cli \
