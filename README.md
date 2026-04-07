@@ -8,7 +8,7 @@ Run SonarQube locally with Docker and scan any project folder — all from a sin
 
 | Tool | Purpose |
 |------|---------|
-| [Docker](https://docs.docker.com/get-docker/) | Runs SonarQube + PostgreSQL containers and the scanner |
+| [Docker](https://docs.docker.com/get-docker/) | Runs the SonarQube container and the scanner |
 | `curl` | Talks to the SonarQube REST API |
 
 No local SonarQube installation or `sonar-scanner` binary is required.
@@ -119,11 +119,10 @@ View results: http://localhost:9000/dashboard?id=my-app
 
 ## Persistence
 
-Docker named volumes keep SonarQube data, extensions, logs, and the PostgreSQL
-database across container restarts. Remove them with:
+Docker named volumes keep SonarQube data, extensions, and logs across container restarts. Remove them with:
 
 ```bash
-docker volume rm sonarqube_data sonarqube_extensions sonarqube_logs postgresql_data
+docker volume rm sonarqube_data sonarqube_extensions sonarqube_logs
 ```
 
 ---
@@ -133,7 +132,7 @@ docker volume rm sonarqube_data sonarqube_extensions sonarqube_logs postgresql_d
 ```
 sonar-local.sh
     │
-    ├── docker compose up        (sonarqube + sonardb containers)
+    ├── docker compose up        (sonarqube container)
     ├── wait for /api/system/status → "UP"
     ├── POST /api/users/change_password   (rotate default password)
     ├── POST /api/projects/create         (idempotent)
