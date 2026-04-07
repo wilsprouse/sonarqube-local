@@ -267,7 +267,10 @@ run_scanner() {
     sonarsource/sonar-scanner-cli \
     -Dsonar.projectKey="${PROJECT_NAME}" \
     -Dsonar.projectName="${PROJECT_NAME}" \
-    -Dsonar.sources=/usr/src \
+    -Dsonar.projectBaseDir=/usr/src \
+    -Dsonar.sources=. \
+    -Dsonar.sourceEncoding=UTF-8 \
+    -Dsonar.scm.exclusions.disabled=true \
     -Dsonar.host.url="${scanner_url}" \
     -Dsonar.token="${token}"
 }
